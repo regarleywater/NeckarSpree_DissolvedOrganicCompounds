@@ -56,7 +56,7 @@ library(ggforce)
 
 ##### 2. CALL FILES and SET UP #####
 
-# Set directory
+#set directory
 Directory <- "C:/Users/Lana/Documents/Projects/R_projects/DataAnalysis/MassSpec_postFBMN/NeckarSpree2_BOTH/Neckar and Spree Rivers Organic Pollutants Data and Code"
 setwd(Directory)
 
@@ -410,9 +410,9 @@ output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),
 # Write the CSV file
 write.csv(t(blk_avg_fm), output_path, row.names = TRUE)
 
-# Apply normalization to all columns except "S68_both_1.mzML" and drop that column
+# Apply normalization to all columns except "Erpe_both_1.mzML" and drop that column
 blk_avg_fm_noErpe <- as.data.frame(
-  apply(blk_avg_pa[rownames(blk_avg_pa) != c("S68_both_1.mzML"),], 2, normalize))
+  apply(blk_avg_pa[rownames(blk_avg_pa) != c("Erpe_both_1.mzML"),], 2, normalize))
 
 # Define output file path
 output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_PeakAreas_ReplicatesAveraged_Scaled_noErpe.csv'))
@@ -447,7 +447,7 @@ length(rows_to_blank)
 
 # Filter the features based on if they have an annotation category
 features_filtered <- features_use %>%
-  filter(Group0 %in% c("a"))
+  filter(Group0 %in% c("all anthropogenic"))
 
 # Extract FeatureIDs present in the feature table after blank removal and subtraction, replicate averaging and scaling
 blk_feature_ids <- gsub(".*X([0-9]+).*$", "\\1", colnames(blk_avg_fm))
@@ -511,7 +511,7 @@ head(V(g)$name)
 
 # Get anthro features from the combined df
 anthro_ids <- all_features_df_1 %>%
-  filter(Source %in% c("a")) %>%
+  filter(Source %in% c("all anthropogenic")) %>%
   pull(FeatureID) %>%
   intersect(V(g)$name)  # make sure they exist in graph
 
@@ -523,13 +523,13 @@ node_to_component <- components_info$membership
 all_features_df_1$ClusterID <- node_to_component[match(all_features_df_1$FeatureID, names(node_to_component))]
 
 # Identify which clusters contain anthro features
-anthro_clusters <- unique(all_features_df_1$ClusterID[all_features_df_1$Source == "a"])
+anthro_clusters <- unique(all_features_df_1$ClusterID[all_features_df_1$Source == "all anthropogenic"])
 
 # Now find nodes in those anthro clusters
 nodes_in_anthro_clusters <- names(node_to_component)[node_to_component %in% anthro_clusters]
 
 # Find nth MN: in anthro clusters, but not anthro or 1st neighbors
-nth_mn <- setdiff(nodes_in_anthro_clusters, all_features_df_1$FeatureID[all_features_df_1$Source %in% c("a", "MN")])
+nth_mn <- setdiff(nodes_in_anthro_clusters, all_features_df_1$FeatureID[all_features_df_1$Source %in% c("all anthropogenic", "MN")])
 
 # Add these to your dataframe
 nth_mn_df <- data.frame(
@@ -578,19 +578,19 @@ all_features_df_use <- combined_df_joined %>%
 # Add cluster ID to all_features_df_use
 all_features_df_use$ClusterID <- node_to_component[match(all_features_df_use$FeatureID, names(node_to_component))]
 
-# Label all others explicitly as "o" if still NA
+# Label all others explicitly as "unknown" if still NA
 # all_features_df_use$Group0[is.na(all_features_df_use$Group0)] <- "u"
 all_features_df_use$Group0[all_features_df_use$Group0 == ""] <- "unknown"
 all_features_df_use$Group1[all_features_df_use$Group1 == ""] <- "unknown"
 all_features_df_use$Group2[all_features_df_use$Group2 == ""] <- "unknown"
-all_features_df_use$Group1[all_features_df_use$Group0 == "b"] <- "biological compound"
-all_features_df_use$Group2[all_features_df_use$Group0 == "b"] <- "biological compound"
+all_features_df_use$Group1[all_features_df_use$Group0 == "biological"] <- "biological compound"
+all_features_df_use$Group2[all_features_df_use$Group0 == "biological"] <- "biological compound"
 
 # Add priority
 print(unique(all_features_df_use$Source))
 all_features_df_use <- all_features_df_use %>%
   mutate(Priority = case_when(
-    Source == "a" ~ 1,
+    Source == "all anthropogenic" ~ 1,
     Source == "MN" ~ 2,
     Source == "nthMN" ~ 3
   )) %>%
@@ -602,8 +602,8 @@ all_features_df_use <- all_features_df_use %>%
 summary <- table(all_features_df_use$Source)
 print(summary)
 
-# For Source = "a"
-summary_a <- table(all_features_df_use$Group1[all_features_df_use$Source == "a"])
+# For Source = "all anthropogenic"
+summary_a <- table(all_features_df_use$Group1[all_features_df_use$Source == "all anthropogenic"])
 print(summary_a)
 
 # For Source = "MN"
@@ -765,7 +765,7 @@ plot_pie_venn_box <- function(data, source_filter, label, Directory) {
 # Anthropogenic features
 plot_pie_venn_box(
   data = blk_avg_md,
-  source_filter = Source %in% c("a", "MN"),
+  source_filter = Source %in% c("all anthropogenic", "MN"),
   label = "AnthropogenicFeatures",
   Directory = Directory
 )
@@ -773,7 +773,7 @@ plot_pie_venn_box(
 # Other features
 plot_pie_venn_box(
   data = blk_avg_md,
-  source_filter = !Source %in% c("a", "MN"),
+  source_filter = !Source %in% c("all anthropogenic", "MN"),
   label = "OtherFeatures",
   Directory = Directory
 )
@@ -811,7 +811,7 @@ plot_pie_venn_box(
 
         # Calculate OTHER features sums per sample
         groupOTHER_contributions <- quant_meta %>%
-          filter(Group0 %in% c("b", "o", "unknown")) %>%
+          filter(Group0 %in% c("biological", "unknown")) %>%
           group_by(Sample) %>%
           summarise(GroupPeak = mean(PeakArea, na.rm = TRUE)) %>%
           mutate(Group = "other") %>%
@@ -862,12 +862,12 @@ plot_pie_venn_box(
 
         # Choose groups that you would like to plot
         unique(corr_df$Group)
-        groups <- c("a",
+        groups <- c("all anthropogenic",
                     "pharmaceutical",
                     "organophosphate","HMMM+", "PAG",
                     "other consumer industrial",
                     "fungicide", "herbicide", "insecticide",
-                    "b", "other",
+                    "biological compound", "other",
                     "all"
         )
 
@@ -877,14 +877,23 @@ plot_pie_venn_box(
         # Filter grouped features dataframe to contain only samples from the main stem
         corr_df_filtered <- corr_df %>%
         filter(Group %in% groups) %>%
-        filter(Sample %in% c("N01_both_1.mzML",     "N02_both_1.mzML",     "N03_both_1.mzML",     "N04_both_1.mzML",
-                             "N05_both_1.mzML",     "N06_both_1.mzML",     "N07_both_1.mzML",     "N08_both_1.mzML",     "N09_both_1.mzML",
+        # filter(Sample %in% c("N01_both_1.mzML",     "N02_both_1.mzML",     "N03_both_1.mzML",     "N04_both_1.mzML",
+        #                      "N05_both_1.mzML",     "N06_both_1.mzML",     "N07_both_1.mzML",     "N08_both_1.mzML",     "N09_both_1.mzML",
+        #                      "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
+        #                      "S01_both_1.mzML",     "S08_both_1.mzML",     "S11_both_1.mzML",     "S13_both_1.mzML",     "S18_both_1.mzML",
+        #                      "S26_both_1.mzML",     "S29_both_1.mzML",     "S51_both_1.mzML",
+        #                      "S56_both_1.mzML",     "S57_both_1.mzML",     "S64_both_1.mzML",     "S67_both_1.mzML",
+        #                      "S69_both_1.mzML",     "S72_both_1.mzML",     "S73_both_1.mzML",
+        #                      "S74_both_1.mzML",     "S75_both_1.mzML",     "S76_both_1.mzML",     "S76a_both_1.mzML"))
+        # 
+        filter(Sample %in% c("N1_both_1.mzML",     "N2_both_1.mzML",     "N3_both_1.mzML",     "N4_both_1.mzML",
+                             "N5_both_1.mzML",     "N6_both_1.mzML",     "N7_both_1.mzML",     "N8_both_1.mzML",     "N9_both_1.mzML",
                              "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
-                             "S01_both_1.mzML",     "S08_both_1.mzML",     "S11_both_1.mzML",     "S13_both_1.mzML",     "S18_both_1.mzML",
-                             "S26_both_1.mzML",     "S29_both_1.mzML",     "S51_both_1.mzML",
-                             "S56_both_1.mzML",     "S57_both_1.mzML",     "S64_both_1.mzML",     "S67_both_1.mzML",
-                             "S69_both_1.mzML",     "S72_both_1.mzML",     "S73_both_1.mzML",
-                             "S74_both_1.mzML",     "S75_both_1.mzML",     "S76_both_1.mzML",     "S76a_both_1.mzML"))
+                             "S1_both_1.mzML",     "S2_both_1.mzML",     "S3_both_1.mzML",     "S4_both_1.mzML",     "S5_both_1.mzML",
+                             "S6_both_1.mzML",     "S7_both_1.mzML",     "S8_both_1.mzML",
+                             "S9_both_1.mzML",     "S10_both_1.mzML",     "S11_both_1.mzML",     "S12_both_1.mzML",
+                             "S13_both_1.mzML",     "S14_both_1.mzML",     "S15_both_1.mzML",
+                             "S16_both_1.mzML",     "S17_both_1.mzML",     "S18_both_1.mzML",     "S19_both_1.mzML"))
 
       length(unique(corr_df_filtered$Group))
 
@@ -1173,7 +1182,7 @@ plot_pie_venn_box(
         blk_rem_new_noErpe <- blk_rem_use %>%
           rename(sample = row.ID) %>%
           mutate(sample_id = paste(sample, "_both_1.mzML", sep = "")) %>%
-          filter(!sample_id %in% c("S68_both_1.mzML")) %>%
+          filter(!sample_id %in% c("Erpe_both_1.mzML")) %>%
           column_to_rownames("sample_id") %>% 
           select(-sample)
         
@@ -1192,7 +1201,7 @@ plot_pie_venn_box(
         # Write the CSV file
         write.csv(blk_avg_fm, output_path, row.names = TRUE)
         
-        # Apply normalization to all columns except "S68_both_1.mzML" and drop that column
+        # Apply normalization to all columns except "Erpe_both_1.mzML" and drop that column
         blk_avg_fm_noErpe <- as.data.frame(apply(blk_rem_new_noErpe, 2, normalize))
         
         # Define output file path
@@ -1386,14 +1395,23 @@ plot_pie_venn_box(
       # Filter for main stem sites only
       corr_df_filtered <- corr_df %>%
       filter(FeatureID %in% Compound_order) %>%
-      filter(Sample %in% c("N01_both_1.mzML",     "N02_both_1.mzML",     "N03_both_1.mzML",     "N04_both_1.mzML",
-                   "N05_both_1.mzML",     "N06_both_1.mzML",     "N07_both_1.mzML",     "N08_both_1.mzML",     "N09_both_1.mzML",
-                   "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
-                   "S01_both_1.mzML",     "S08_both_1.mzML",     "S11_both_1.mzML",     "S13_both_1.mzML",     "S18_both_1.mzML",
-                   "S26_both_1.mzML",     "S29_both_1.mzML",     "S51_both_1.mzML",
-                   "S56_both_1.mzML",     "S57_both_1.mzML",     "S64_both_1.mzML",     "S67_both_1.mzML",
-                   "S69_both_1.mzML",     "S72_both_1.mzML",     "S73_both_1.mzML",
-                   "S74_both_1.mzML",     "S75_both_1.mzML",     "S76_both_1.mzML",     "S76a_both_1.mzML"))
+      # filter(Sample %in% c("N01_both_1.mzML",     "N02_both_1.mzML",     "N03_both_1.mzML",     "N04_both_1.mzML",
+      #              "N05_both_1.mzML",     "N06_both_1.mzML",     "N07_both_1.mzML",     "N08_both_1.mzML",     "N09_both_1.mzML",
+      #              "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
+      #              "S01_both_1.mzML",     "S08_both_1.mzML",     "S11_both_1.mzML",     "S13_both_1.mzML",     "S18_both_1.mzML",
+      #              "S26_both_1.mzML",     "S29_both_1.mzML",     "S51_both_1.mzML",
+      #              "S56_both_1.mzML",     "S57_both_1.mzML",     "S64_both_1.mzML",     "S67_both_1.mzML",
+      #              "S69_both_1.mzML",     "S72_both_1.mzML",     "S73_both_1.mzML",
+      #              "S74_both_1.mzML",     "S75_both_1.mzML",     "S76_both_1.mzML",     "S76a_both_1.mzML"))
+      # 
+      filter(Sample %in% c("N1_both_1.mzML",     "N2_both_1.mzML",     "N3_both_1.mzML",     "N4_both_1.mzML",
+                           "N5_both_1.mzML",     "N6_both_1.mzML",     "N7_both_1.mzML",     "N8_both_1.mzML",     "N9_both_1.mzML",
+                           "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
+                           "S1_both_1.mzML",     "S2_both_1.mzML",     "S3_both_1.mzML",     "S4_both_1.mzML",     "S5_both_1.mzML",
+                           "S6_both_1.mzML",     "S7_both_1.mzML",     "S8_both_1.mzML",
+                           "S9_both_1.mzML",     "S10_both_1.mzML",     "S11_both_1.mzML",     "S12_both_1.mzML",
+                           "S13_both_1.mzML",     "S14_both_1.mzML",     "S15_both_1.mzML",
+                           "S16_both_1.mzML",     "S17_both_1.mzML",     "S18_both_1.mzML",     "S19_both_1.mzML"))
       
       # Pivot to wide format for ComplexHeatmap
       heatmap_matrix <- corr_df_filtered %>%
