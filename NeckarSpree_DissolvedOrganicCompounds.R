@@ -9,87 +9,55 @@
 
 ##### 1. LOAD LIBRARIES #####
 
-# Global settings for plot size in the output cell:
-options(repr.plot.width=10, repr.plot.height=10, res=600) # the parameters: width, height & resolution can be changed
-
 library("tidyverse")
-library("factoextra")
-library("KODAMA")
-library("vegan")
-library("IRdisplay")
-library("svglite")
-library("matrixStats")
-library("ggsci")
-library("FSA")
+library("dplyr")
 library("cowplot")
-library("BiocManager")
-library("ComplexHeatmap")
-library("dendextend")
-library("NbClust")
-library("xgboost")
-library("caret")
-library("doParallel")
-library("ggrepel")
-library("rfPermute")
-library("stringr")
-library("VennDiagram")
 library("ggplot2")
+library("igraph")
 library("ggvenn")
-library("ggtext")
-library("gridExtra")
-library("viridis")
-library("ggbreak")
-library("kml")
-library("broom")
-library("data.table")
-library(dplyr)
-library(stringr)
-library(rstatix)
-library(rlang)
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(broom)
-library(ggridges)
-library(forcats)
-library(ggforce)
+library("ComplexHeatmap")
+
 
 ##### 2. CALL FILES and SET UP #####
 
-#set directory
+### Set directory ! ###
 Directory <- "C:/Users/Lana/Documents/Projects/R_projects/DataAnalysis/MassSpec_postFBMN/NeckarSpree2_BOTH/Neckar and Spree Rivers Organic Pollutants Data and Code"
+# e.g.: "C:/Users/user/R_projects/Neckar and Spree Rivers Organic Pollutants Data and Code""
 setwd(Directory)
 
+### Call files ###
 # Create folders for output if not already there
 dir.create(file.path(Directory, "02_Output_DataProducts"))
 dir.create(file.path(Directory, "03_Output_Figures"))
 
-# Call file with supplemental data that can go in scatter plots 
+# Call file with feature annotation groups
 fileName_anthro <- file.path(Directory, "01_Data", "FeatureGroups_Assignment.csv")
 df_csv_anthro <- read.csv(fileName_anthro,  head=TRUE, sep=",")
 colnames(df_csv_anthro)
 
-# Call file with MN results
+# Call file with molecular network results
 fileName_edges <- file.path(Directory, "01_Data", "FeatureEdges_MolecularNetwork.csv")
 df_csv_edges <- read.csv(fileName_edges,  head=TRUE, sep=",")
 dim(df_csv_edges)
 
-# call in csv file with Targeted Values info
+# Call file with targeted concentrations
 fileName_TA <- file.path(Directory, "01_Data", "Targeted_Concentrations.csv")
 df_csv_TAorig <- read.csv(fileName_TA,  head=TRUE, sep=",")
 dim(df_csv_TAorig)
 
-#load files from directory
+
+### Call files that need reformatting (NTA files) ###
+# Load files from directory
 file_names <- list.files('.') #list all the files in the working directory (mentioned by 'dot symbol')
 file_names
 
-#identify names of quant and metadata tables in directory
+# Identify names of feature quant and metadata tables in directory
 input_str <- "NonTargeted_PeakAreas_Raw.csv,Sample_Metadata.txt,FeatureAnnotations_GNPSoutput.tsv"
 
-#read the files indicated by the indecies 
+# Read the files indicated by the indecies 
 input <- (strsplit(input_str, ",")[[1]])
 
-# reading feature table
+# Read feature quant table
 first_line <- readLines(file.path(Directory, "01_Data", input[1]), n = 1)
 if (length(strsplit(first_line, ';')[[1]]) > 1) {
   ft <- read.csv(file.path(Directory, "01_Data", input[1]), header = T, check.names = F, sep = ';') # in case, ';' is the separator
@@ -97,22 +65,21 @@ if (length(strsplit(first_line, ';')[[1]]) > 1) {
   ft <- read.csv(file.path(Directory, "01_Data", input[1]), header = T, check.names = F)
 }
 
-### Metadata ###
-#reading metadata
+# Read metadata
 md <- read.csv(file.path(Directory, "01_Data", input[2]), header = T, check.names = F, sep = '\t') # mention seperator as "/t"(tab-separated) in case of txt or tsv fi
 
 ### Annotations ###
-#GNPS Annotations:
+# Load GNPS annotations:
 an_gnps <- read.csv(file.path(Directory, "01_Data", input[3]), header = T, check.names = F, sep = '\t') 
 
-#explore table dimensions
-dim(ft) # gives the number of rows and  columns
+# Check table dimensions
+dim(ft) 
 dim(md)
 dim(an_gnps) 
 
 
-
-#function to summarize metadata
+### Reformat files ###
+# Function to summarize metadata
 InsideLevels <- function(metatable){
   LEVELS <- c() #creating empty vector to store information
   typ <-c()
@@ -135,41 +102,40 @@ InsideLevels <- function(metatable){
   return(out)
 }
 
-#check out metadata
+# Check out metadata dimensions & content
 ncol(md) #number of columnns of metadata
 InsideLevels(md[, 2:ncol(md)]) #excluding 1st filename
 
-#check compatibility of annotations with feature table ids by checking their class
+# Check compatibility of annotations with feature table ids by checking their class
 identical(class(ft$`row ID`),class(an_gnps$`#Scan#`))
 
-#arrange annotations by Scan number
+# Arrange annotations by Scan number
 an_final <- an_gnps %>% arrange(`#Scan#`) #arranging by scan ID
 
-#compare GNPS and analog annotations
-#Function to compare between gnps_compound_name and its library match (analog)
+# Reformat GNPS annotations
+# Function to compare between gnps_compound_name and its library match (analog)
 combine_names <- function(compound_name) {
   return(paste(compound_name))
 }
 
-# POS Consolidate multiple annotations for a single '#Scan#' into one combined name
+# Consolidate multiple annotations for a single '#Scan#' into one combined name
 an_final_single <- an_final %>%
   group_by(`#Scan#`) %>%
   summarise(Combined_Name = combine_names(Compound_Name[1])) %>%
   ungroup() %>%
   as.data.frame()
 
-#merge annotations with feature table
+# Merge annotations with feature table
 ft_an <- merge(ft, an_final_single, by.x="row ID", by.y="#Scan#", all.x= TRUE) 
 head(ft_an, 2)
 dim(ft_an) 
 
 
-#Arrange feature table and metadata in same order
-#create duplicate (working) files
-new_ft <- ft #storing the files under different names to preserve the original files
+# Arrange feature table and metadata in same order and create duplicate (working) files
+new_ft <- ft 
 new_md <- md
 
-#clean the new files
+# Clean the new files
 colnames(new_ft) <- gsub(' Peak area','',colnames(new_ft)) #removing Peak area extensions from the column names of ft
 new_ft <- new_ft[order(new_ft$`row ID`),,drop=F] #arranging the rows of ft file by  by ascending order of row ID
 new_ft <- new_ft[,colSums(is.na(new_ft))<nrow(new_ft)] #removing if any NA columns present in the ft file,
@@ -177,25 +143,26 @@ new_md <- new_md[,colSums(is.na(new_md))<nrow(new_md)] #removing if any NA colum
 new_md <- new_md[apply(new_md != "", 1, any), ] # Removing rows that are completely filled with empty strings,
 new_md <- new_md[, apply(new_md != "", 2, any)] # Removing columns that are completely filled with empty strings
 
-#remove the (front & tail) spaces, if any present, from the filenames of md,
+# Remove the (front & tail) spaces, if any present, from the filenames of md
 new_md$filename <- trimws(new_md$filename, which = c("both"))
 rownames(new_md) <- new_md$filename
 new_md <- new_md[, -which(names(new_md) == "filename")]
 
-#update row names of feature table
+# Update row names of feature table
 if(exists("ft_an")){identical(ft_an$`row ID`,new_ft$`row ID`)} #should return TRUE if you have annotation file
 
-#Changing the row names of the files into the combined name as "XID_mz_RT":
+# Change the row names of the files into the combined name as "XID_mz_RT":
 rownames(new_ft) <- paste(paste0("X",new_ft$`row ID`),
                           round(new_ft$`row m/z`,digits = 3),
                           round(new_ft$`row retention time`,digits = 3),
                           if(exists("ft_an")){ft_an$Combined_Name}, 
                           sep = '_') 
 
-rownames(new_ft) <- sub("_$", "", rownames(new_ft)) #to remove the trailing underscore at rownames
+# Remove the trailing underscore at rownames
+rownames(new_ft) <- sub("_$", "", rownames(new_ft)) 
 
 
-#in the feature table, identify which columns correspond to samples
+# In the feature table, identify which columns correspond to samples
 # Check if columns contain 'mzXML' or 'mzML' extensions
 if (any(grepl('.mzML', colnames(new_ft)))) {
   # Picking only the files with column names containing 'mzXML' or 'mzML'
@@ -212,28 +179,21 @@ if (any(grepl('.mzML', colnames(new_ft)))) {
   new_ft <- new_ft[, grepl(your_extension, colnames(new_ft))]
 }
 
-# Checking the files again to see if the above changes have been made
-#head(new_ft,2)
-dim(new_ft)
-
-#head(new_md,2)
-dim(new_md)
-
-#check overlap between the feature table and metadata
+# Check overlap between the feature table and metadata
 new_ft <- new_ft[,order(colnames(new_ft)), drop=F] #ordering the ft by its column names
 new_md <- new_md[order(rownames(new_md)),, drop=F] #ordering the md by the 1st column filename
 
-#how many files in the metadata are also present in the feature table
+# How many files in the metadata are also present in the feature table
 table(rownames(new_md) %in% colnames(new_ft))
 
-#are the sample names the same
+# Are the sample names the same
 identical(rownames(new_md), colnames(new_ft))
 
-# which file names in the metadata are not in the feature table?
+# Which file names in the metadata are not in the feature table?
 setdiff(rownames(new_md),colnames(new_ft))
 # print(colnames(new_ft)) # uncomment to check the column names of new_ft
 
-#checking the dimensions of our new ft and md:
+# Checking the dimensions of our new ft and md:
 cat("The number of rows and columns in our original ft is:",dim(ft),"\n")
 cat("The number of rows and columns in our new ft is:",dim(new_ft),"\n")
 cat("The number of rows and columns in our new md is:",dim(new_md))
@@ -242,28 +202,27 @@ cat("The number of rows and columns in our new md is:",dim(new_md))
 new_ft <- new_ft[rowSums(new_ft != 0) > 0,]
 dim(new_ft)
 
+# Print summary of the feature table
 cat("The number of rows and non-zero columns in our new ft is:",dim(new_ft))
 
-##### 3 PROCESSING For NON-TARGETED FEATURES #####
-##### 3.1 BLANK REMOVAL and SUBTRACTION #####
-
-#transpose and merge feature table and metadata
+# Transpose and merge feature table and metadata
 ft_t <- as.data.frame(t(new_ft)) #transposing the ft
 ft_t <- ft_t %>% mutate_all(as.numeric)  #converting all values to numeric
 identical(rownames(new_md),rownames(ft_t)) #should return TRUE now
 
-#check out the results
-head(ft_t,3)
 
-#get the index levels in your data
+##### 3 PROCESSING For NON-TARGETED FEATURES #####
+##### 3.1 BLANK REMOVAL and SUBTRACTION #####
+
+# Get the index levels in your metadata
 InsideLevels(new_md)
 
-#enter indecies
-#sample_attribute <- as.numeric(readline('Enter the index number of the attribute containing sample and blanks information: '))
+# Enter indecies
+# Sample_attribute <- as.numeric(readline('Enter the index number of the attribute containing sample and blanks information: '))
 sample_attribute <- as.numeric("7")
 unique_sampletypes <- unique(new_md[, sample_attribute])
 
-# Display the unique sample types along with their index
+# Display the unique sample types along with their index & select desired indecies for blanks and samples
 cat("Available sample types:/n")
 print(unique_sampletypes)
 #display(data.frame(INDEX = 1:length(unique_sampletypes), LEVELS = unique_sampletypes))
@@ -280,88 +239,92 @@ sample_ID <- as.numeric("2")
 md_Blank <- new_md[new_md[, sample_attribute] %in% unique_sampletypes[blank_ID],]
 md_Samples <- new_md[new_md[, sample_attribute] %in% unique_sampletypes[sample_ID],]
 
-# Getting the corresponding rows from ft_t
+# Get the corresponding rows from ft_t
 Blank <- ft_t[which(rownames(ft_t) %in% (rownames(md_Blank))), , drop=F]
 Samples <- ft_t[which(rownames(ft_t) %in% (rownames(md_Samples))), , drop=F]
 InsideLevels(new_md)
 
-#check out results
-#head(Blank,n=2)
+# Check out results
 dim(Blank) 
-#head(Samples, n=2)
 dim(Samples)
 
-#set Blank cutoff
-#When cutoff is low, more noise (or background) detected; With higher cutoff, less background detected, thus more features observed
-#Cutoff <- as.numeric(readline('Enter Cutoff value between 0.1 & 1:')) # (i.e. 10% - 100%). Ideal cutoff range: 0.1-0.3
+
+### Blank Removal Step ###
+# Set the Blank removal cutoff value
+# When cutoff is low, more noise (or background) detected; With higher cutoff, less background detected, thus more features observed
+# Cutoff <- as.numeric(readline('Enter Cutoff value between 0.1 & 1:')) # (i.e. 10% - 100%). Ideal cutoff range: 0.1-0.3
 Cutoff <- as.numeric(0.1)
 
-#Getting mean for every feature in blank and Samples in a data frame named 'Avg_ft'
+# Get mean for every feature in Blank and Samples in a data frame named 'Avg_ft'
 Avg_ft <- data.frame(Avg_blank=colMeans(Blank, na.rm= F)) # set na.rm = F to check if there are NA values. When set as T, NA values are changed to 0
-# Avg_ft$Max_blank <- apply(Blank, 2, max, na.rm = F) # set na.rm = F to check if there are NA values. When set as T, NA values are changed to 0
 Avg_ft$Avg_samples <- colMeans(Samples, na.rm= F) # adding another column 'Avg_samples' for feature means of samples
 
-#Getting the ratio of blank vs Sample
+# Get the ratio of Blank vs Sample
 Avg_ft$Ratio_blank_Sample <- (Avg_ft$Avg_blank+1)/(Avg_ft$Avg_samples+1)
 
-# Creating a bin with 1s when the ratio>Cutoff, else put 0s
+# Create a bin with 1s when the ratio > Cutoff, else put 0s
 Avg_ft$Bg_bin <- ifelse(Avg_ft$Ratio_blank_Sample > Cutoff, 1, 0 )
 
-#Calculating the number of background features and features present
+# Calculate the number of background features and features present
 print(paste("Total no.of features:",nrow(Avg_ft)))
 print(paste("No.of Background or noise features:",sum(Avg_ft$`Bg_bin` ==1,na.rm = T)))
 print(paste("No.of features after excluding noise:",(ncol(Samples) - sum(Avg_ft$`Bg_bin` ==1,na.rm = T))))
 
+# Create a new, blank removed dataframe
 blk_rem_1 <- merge(as.data.frame(t(Samples)), Avg_ft, by=0) %>%
   filter(Bg_bin == 0) %>% #picking only the features
   select(-c(Avg_blank,Avg_samples,Ratio_blank_Sample,Bg_bin)) %>% #removing the last 4 columns
   column_to_rownames(var="Row.names") 
+
+# Set blank removed dataframe as data frame and transpose
   blk_rem <- as.data.frame(t(blk_rem_1))
   
-        # Blank subtraction step (using max value observed in the blanks) ##
-        # Add Max_blank column to Avg_ft
-        Avg_ft$Max_blank <- apply(t(Blank), 1, max, na.rm = TRUE)
-        
-        # Correctly match feature names using row names from Avg_ft
-        Blank_max_filtered <- Avg_ft[names(blk_rem), "Max_blank", drop = FALSE]$Max_blank
-        
-        # Subtract Max blank values from Samples, ensuring no negative values
-        blk_rem_sub <- sweep(blk_rem, 2, Blank_max_filtered, FUN = "-")
-        blk_rem_sub[blk_rem_sub < 0] <- 0  # Set negative values to zero
-        
-        # Determine the limit of detection (LOD)
-        Cutoff_LOD <- round(min(blk_rem[blk_rem > 0], na.rm = TRUE))
-        print(paste0("The limit of detection (LOD) is: ", Cutoff_LOD))
-        
-        # Apply LOD correction
-        blk_rem_sub[blk_rem_sub > 0 & blk_rem_sub < Cutoff_LOD] <- 0
-        
-        # View the final processed dataset
-        print(dim(blk_rem_sub))
-        
-        # Print results
-        # Define output file path
-        output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_PeakAreas_BlanksRemoved_and_MaxSubtracted_with_cutoff_',Cutoff,'.csv'))
-        # Write the CSV file
-        write.csv(t(blk_rem_sub), output_path, row.names = TRUE)
+  
+### Blank Subtraction step ###
+# Use max value observed in the blanks 
+# Add Max_blank column to Avg_ft
+Avg_ft$Max_blank <- apply(t(Blank), 1, max, na.rm = TRUE)
 
+# Correctly match feature names using row names from Avg_ft
+Blank_max_filtered <- Avg_ft[names(blk_rem), "Max_blank", drop = FALSE]$Max_blank
+
+# Subtract Max blank values from Samples, ensuring no negative values
+blk_rem_sub <- sweep(blk_rem, 2, Blank_max_filtered, FUN = "-")
+blk_rem_sub[blk_rem_sub < 0] <- 0  # Set negative values to zero
+
+# Determine the limit of detection (LOD)
+Cutoff_LOD <- round(min(blk_rem[blk_rem > 0], na.rm = TRUE))
+print(paste0("The limit of detection (LOD) is: ", Cutoff_LOD))
+
+# Apply LOD correction
+blk_rem_sub[blk_rem_sub > 0 & blk_rem_sub < Cutoff_LOD] <- 0
+
+# View the final processed dataset
+print(dim(blk_rem_sub))
+
+# Print results
+# Define output file path & write the .csv file
+output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_PeakAreas_BlanksRemoved_and_MaxSubtracted_with_cutoff_',Cutoff,'.csv'))
+write.csv(t(blk_rem_sub), output_path, row.names = TRUE)
         
 # Ensure the final dataframe is formatted correctly
 blk_rem_sub <- as.data.frame(blk_rem_sub)
 
-# review dimensions of feature table wihtout blanks
+# Review dimensions of feature table without blanks
 dim(blk_rem_sub)
 
-# review dimensions of metadata without the blanks info 
+# Review dimensions of metadata without the blanks info 
 dim(md_Samples)
 
 
 ##### 3.2 PEAK AREA REPLICATE AVERAGING and SCALING #####
 
-# make copies of data tables
+# Make copies of data tables
 blk_rem_use <- blk_rem_sub
 md_Samples_use <- md_Samples
 
+
+### Average the replicate samples ###
 # Create a function to calculate the average with the specified condition
 average_with_zero_condition <- function(values) {
   if(any(values == 0)) {
@@ -383,50 +346,42 @@ blk_avg_pa <- blk_rem_new %>%
   column_to_rownames("sample_id")
 dim(blk_avg_pa)
 
-# remove zero-variance columns
+# Remove zero-variance columns
 blk_avg_pa <- blk_avg_pa[, apply(blk_avg_pa, 2, sd) != 0]
-
 dim(blk_avg_pa)
 
-# Define output file path
+# Define output file path & write .csv
 output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_PeakAreas_ReplicatesAveraged.csv'))
-
-# Write the CSV file
 write.csv(t(blk_avg_pa), output_path, row.names = TRUE)
 
 
-## Scaling
-# feature max norm function
+### Scale the averaged feature peak areas - with Erpe sample ###
+# Make function to normalize features by the maximum value observed for each across all samples
 normalize <- function(x) {
   return(x / max(x))
 }
 
-# Applying the normalization function to each column
+# Apply the normalization function to each column
 blk_avg_fm <- as.data.frame(apply(blk_avg_pa, 2, normalize))
 
-# Define output file path
+# Define output file path & write .csv
 output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_PeakAreas_ReplicatesAveraged_Scaled.csv'))
-
-# Write the CSV file
 write.csv(t(blk_avg_fm), output_path, row.names = TRUE)
 
+
+### Scale the averaged feature peak areas - without Erpe sample ###
 # Apply normalization to all columns except "Erpe_both_1.mzML" and drop that column
 blk_avg_fm_noErpe <- as.data.frame(
   apply(blk_avg_pa[rownames(blk_avg_pa) != c("Erpe_both_1.mzML"),], 2, normalize))
 
-# Define output file path
+# Define output file path & write .csv
 output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_PeakAreas_ReplicatesAveraged_Scaled_noErpe.csv'))
-
-# Write the CSV file
 write.csv(t(blk_avg_fm_noErpe), output_path, row.names = TRUE)
 
 
 ##### 3.3 SUBSET ANTHROPOGENIC FEATURES USING ANNOTATIONS and MOLECULAR NETWORKS#####
 
-library(dplyr)
-library(igraph)
-
-# Create a copy of the original feature group table
+# Create a copy of the original feature annotations group table
 features_use <- df_csv_anthro
 
 # Define the group columns
@@ -495,11 +450,9 @@ combined_feature_ids <- all_features_df$FeatureID
 
 # Create new df to use
 all_features_df_1 <- all_features_df 
-# %>%
-#   merge(features_use[, c("FeatureID", "Group0", "Group1", "Group2")], by.x = "Parent", by.y = "FeatureID", all.x = TRUE)
+
 
 ### Use igraph to add nth MN and cluster info ###
-
 # Ensure only 2 columns are passed to define edges
 edge_df <- df_csv_edges_use[, c("node1", "node2")]
 
@@ -610,39 +563,31 @@ print(summary_a)
 summary_MN <- table(all_features_df_use$Group1[all_features_df_use$Source == "MN"])
 print(summary_MN)
 
-
-# Write results
-# Define output file path
+# Define output file path & write .csv
 output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(), "_Feature_Annotations_MNneighbors_and_Groups.csv"))
-
-# Write the CSV file
 write.csv(all_features_df_use, output_path, row.names = TRUE)
 
                                                           
 ##### 3.4 DATA OVERVIEW and RIVER COMPARISON (FIGURE 2) #####                 
-                      
+ 
+# Reformat scaled feature quant dataframe from wide to long format - Use all Samples (i.e., with Erpe)                    
 long_quant <- blk_avg_fm %>%
   tibble::rownames_to_column("Sample") %>%
   pivot_longer(-Sample, names_to = "Feature", values_to = "PeakArea")
 
+# Set "Sample" as a column in the metadata
 md_Samples_use$Sample <- rownames(md_Samples_use)
 
-# Extract FeatureID from column names (assuming X123_abcd format) FOR NON-TARGETED
+# Extract FeatureID from column names (assuming X123_abcd format)
 blk_avg_md <- long_quant %>%
   mutate(FeatureID = as.numeric(gsub(".*X([0-9]+).*", "\\1", Feature))) %>%
   left_join(all_features_df_use %>% select(FeatureID, Source, Group0, Group1, Group2), by = "FeatureID")  %>%
   left_join(md_Samples_use, by = "Sample")
 
+# Replace NA values with "unknown"
 blk_avg_md$Group0[is.na(blk_avg_md$Group0)] <- "unknown"
 blk_avg_md$Group1[is.na(blk_avg_md$Group1)] <- "unknown"
 blk_avg_md$Group2[is.na(blk_avg_md$Group2)] <- "unknown"
-
-# Assuming your dataframe is called df
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(ggvenn)
-library(ggpubr)
 
 # Define color palette for Group1
 group1_colors <- c(
@@ -650,10 +595,11 @@ group1_colors <- c(
   "other consumer industrial" = "#7570B3",
   "pesticide"  = "#66A61E",
   "pharmaceutical" = "#377EB8",
-  "polymer additive" = "#FF7F00",
+  "polymer-related" = "#FF7F00",
   "unknown" = "#999999"
 )
 
+### Plot Figure 2 figures ###
 plot_pie_venn_box <- function(data, source_filter, label, Directory) {
   
   # Subset dataframe
@@ -690,7 +636,7 @@ plot_pie_venn_box <- function(data, source_filter, label, Directory) {
   pdf(pie_out, height = 4, width = 4)
   print(pie_plot)
   dev.off()
-  
+
   # --- VENN DIAGRAM ---
   venn_list_df <- df %>%
     filter(PeakArea > 0) %>%
@@ -718,7 +664,7 @@ plot_pie_venn_box <- function(data, source_filter, label, Directory) {
   venn_out <- file.path(Directory, "03_Output_Figures",
                         paste0(Sys.Date(), "_Venn_", label, ".pdf"))
   
-  pdf(file = venn_out, height = 3, width = 3)
+  pdf(file = venn_out, height = 4, width = 4)
   print(venn_plot)
   dev.off()
   
@@ -784,7 +730,7 @@ plot_pie_venn_box(
 ##### 3.5 HEATMAP of FEATURE GROUPS across SITES (FIGURE 3) #####
 
 # Prepare the data by grouping features 
-        # Convert scaled peak areas dataframe to long format
+        # Reformat scaled feature quant table from wide to long format - Use all samples except Erpe
         long_quant <- blk_avg_fm_noErpe %>%
           tibble::rownames_to_column("Sample") %>%
           pivot_longer(-Sample, names_to = "Feature", values_to = "PeakArea")
@@ -823,7 +769,7 @@ plot_pie_venn_box(
           summarise(GroupPeak = mean(PeakArea, na.rm = TRUE)) %>%
           rename(Group = Group0)
 
-        # Calculate total and group2 sums per sample
+        # Calculate Group1 sums per sample
         group1_contributions <- quant_meta %>%
           group_by(Sample, Group1) %>%
           summarise(GroupPeak = mean(PeakArea, na.rm = TRUE)) %>%
@@ -877,15 +823,6 @@ plot_pie_venn_box(
         # Filter grouped features dataframe to contain only samples from the main stem
         corr_df_filtered <- corr_df %>%
         filter(Group %in% groups) %>%
-        # filter(Sample %in% c("N01_both_1.mzML",     "N02_both_1.mzML",     "N03_both_1.mzML",     "N04_both_1.mzML",
-        #                      "N05_both_1.mzML",     "N06_both_1.mzML",     "N07_both_1.mzML",     "N08_both_1.mzML",     "N09_both_1.mzML",
-        #                      "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
-        #                      "S01_both_1.mzML",     "S08_both_1.mzML",     "S11_both_1.mzML",     "S13_both_1.mzML",     "S18_both_1.mzML",
-        #                      "S26_both_1.mzML",     "S29_both_1.mzML",     "S51_both_1.mzML",
-        #                      "S56_both_1.mzML",     "S57_both_1.mzML",     "S64_both_1.mzML",     "S67_both_1.mzML",
-        #                      "S69_both_1.mzML",     "S72_both_1.mzML",     "S73_both_1.mzML",
-        #                      "S74_both_1.mzML",     "S75_both_1.mzML",     "S76_both_1.mzML",     "S76a_both_1.mzML"))
-        # 
         filter(Sample %in% c("N1_both_1.mzML",     "N2_both_1.mzML",     "N3_both_1.mzML",     "N4_both_1.mzML",
                              "N5_both_1.mzML",     "N6_both_1.mzML",     "N7_both_1.mzML",     "N8_both_1.mzML",     "N9_both_1.mzML",
                              "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
@@ -894,7 +831,7 @@ plot_pie_venn_box(
                              "S9_both_1.mzML",     "S10_both_1.mzML",     "S11_both_1.mzML",     "S12_both_1.mzML",
                              "S13_both_1.mzML",     "S14_both_1.mzML",     "S15_both_1.mzML",
                              "S16_both_1.mzML",     "S17_both_1.mzML",     "S18_both_1.mzML",     "S19_both_1.mzML"))
-
+      # Check number of Groups
       length(unique(corr_df_filtered$Group))
 
       # Pivot to wide format for ComplexHeatmap
@@ -908,9 +845,7 @@ plot_pie_venn_box(
       # Ensure rownames are a factor in the correct order
       heatmap_matrix_ordered <- heatmap_matrix[groups, , drop = FALSE]
 
-      library(ComplexHeatmap)
-      library(circlize)
-
+      # Generate heatmap dataframe
       set.seed(1235)
       hmap <- Heatmap(
         heatmap_matrix_ordered,  # or use heatmap_matrix if unscaled
@@ -932,11 +867,11 @@ plot_pie_venn_box(
         row_km_repeats = 100
       )
 
+      # Plot heatmap
       hk <- ComplexHeatmap::draw(hmap, heatmap_legend_side = "right", annotation_legend_side = "right")
 
       # Save plot
       output_path <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Heatmap_AveragedandScaled_GroupedFeatures_PeakAreas_MainRiverSites_noErpe.pdf"))
-
       pdf(file = output_path, height = 30, width = 30)
       print(hk)
       dev.off()
@@ -967,7 +902,7 @@ plot_pie_venn_box(
         mutate(MetadataVar = factor(MetadataVar, levels = meta_vars),
                Group = factor(Group, levels = groups_levels))
 
-
+      # Add p-value to summary
       cor_summary <- cor_summary %>%
         mutate(Signif = case_when(
           Pvalue < 0.001 ~ "***",
@@ -976,10 +911,8 @@ plot_pie_venn_box(
           TRUE ~ ""
         ))
 
-      # Define output file path
+      # Define output file path & write .csv
       output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(), "_Correlation_GroupedFeatsVsSiteChar_SpearmanRho_AllSites_noErpe.csv"))
-
-      # Write the CSV file
       write.csv(cor_summary, output_path, row.names = TRUE)
 
       # Plot correlations in Neckar
@@ -1026,133 +959,8 @@ plot_pie_venn_box(
 
         # Save correlation results figures together
         output_path <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Correlation_GroupedFeatsVsSiteChar_SpearmanRho_AllSites_noErpe.pdf"))
-
         pdf(file = output_path, height = 7, width = 13)
         plot_grid( spree,  neckar, ncol = 2, nrow = 1, rel_widths = c(1,1), rel_heights = c(1,1,1,1), label_size = 24, label_y = 0.9,
-                   align = "v")
-        dev.off()
-
-# Correlate feature groups with each other
-        library(dplyr)
-        library(tidyr)
-        library(purrr)
-
-        # Make sure character
-        corr_df_use <- corr_df %>%
-          mutate(across(c(Sample, ATTRIBUTE_RiverGroup, Group), as.character))
-
-        # Round to numeric to 4 decimal
-        corr_df_use <- corr_df_use %>%
-        mutate(across(where(is.numeric), ~ round(.x, 4)))
-
-        # Pivot data wider: one column per Group
-        corr_wide <- corr_df_use %>%
-          filter(Group %in% groups) %>%
-          select(Sample, ATTRIBUTE_RiverGroup, Group, GroupPeak) %>%
-          pivot_wider(names_from = Group, values_from = GroupPeak)
-
-        # Rename the column in corr_wide
-        corr_wide <- corr_wide %>%
-          rename(OtherConInd = `other consumer industrial`)
-
-        # Extract the first element from each list in OtherConInd
-        corr_wide <- corr_wide %>%
-          mutate(OtherConInd = map_dbl(OtherConInd, ~ .x[1]))
-
-        # Ensure group columns are numeric
-        corr_wide <- corr_wide %>%
-          mutate(across(!c(Sample, ATTRIBUTE_RiverGroup), as.numeric))
-
-        # Function to compute correlations between groups
-        get_cor_summary <- function(df, ATTRIBUTE_RiverGroup) {
-          groups_cols <- setdiff(names(df), c("Sample", "ATTRIBUTE_RiverGroup"))
-
-          # All unique group pairs
-          pairs <- combn(groups_cols, 2, simplify = FALSE)
-
-          map_dfr(pairs, function(pair) {
-            x <- df[[pair[1]]]
-            y <- df[[pair[2]]]
-
-            ct <- cor.test(x, y, method = "spearman")
-
-            tibble(
-              Group1 = pair[1],
-              Group2 = pair[2],
-              ATTRIBUTE_RiverGroup = ATTRIBUTE_RiverGroup,
-              Correlation = unname(ct$estimate),
-              Pvalue = ct$p.value
-            )
-          })
-        }
-
-        # Run per ATTRIBUTE_RiverGroup
-        cor_summary <- corr_wide %>%
-          group_split(ATTRIBUTE_RiverGroup) %>%
-          map_dfr(~ get_cor_summary(.x, unique(.x$ATTRIBUTE_RiverGroup)))
-
-        cor_summary <- cor_summary %>%
-          mutate(Signif = case_when(
-            Pvalue < 0.001 ~ "***",
-            Pvalue < 0.01 ~ "**",
-            Pvalue < 0.05 ~ "*",
-            TRUE ~ ""
-          ))
-
-        # Define output file path
-        output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(), "_Correlation_BetweenFeatureGroups_SpearmanRho_AllSites_noErpe.csv"))
-
-        # Write the CSV file
-        write.csv(cor_summary, output_path, row.names = TRUE)
-
-        # Plot correlations in Neckar
-        neckar <- ggplot(cor_summary[cor_summary$ATTRIBUTE_RiverGroup == "Neckar",], aes(x = Group1, y = Group2)) +
-          geom_point(aes(size = abs(Correlation), color = Correlation)) +
-          geom_text(aes(label = Signif), size = 5, vjust = 0.8) + #vjust = -1.2
-          scale_color_gradient2(
-            low = "red", mid = "white", high = "blue", midpoint = 0, limits = c(-1, 1),
-            name = "spearman r"
-          ) +
-          scale_size(range = c(0.5, 12), limits = c(0, 1), name = "|p|") +
-          theme_bw() +
-          labs(
-            # title = "Correlation Between Group PA and Metadata",
-            x = "Feature Group",
-            y = "Feature Group"
-          ) +
-          theme(
-            axis.text.x = element_text(angle = 90, hjust = 1, size = 14),
-            axis.text.y = element_blank(),
-            axis.title.y = element_blank(),
-            legend.position = "right"
-          )
-
-        # Plot correlations in Spree
-        spree <- ggplot(cor_summary[cor_summary$ATTRIBUTE_RiverGroup == "Spree",], aes(x = Group1, y = Group2)) +
-          geom_point(aes(size = abs(Correlation), color = Correlation)) +
-          geom_text(aes(label = Signif), size = 5, color = "black", vjust = 0.8) +
-          scale_color_gradient2(
-            low = "red", mid = "white", high = "blue", midpoint = 0, limits = c(-1, 1),
-            name = "spearman r"
-          ) +
-          scale_size(range = c(0.5, 12), limits = c(0, 1), name = "|p|") +
-          theme_bw() +
-          labs(
-            # title = "Correlation Between Group PA and Metadata",
-            x = "Feature Group",
-            y = "Feature Group"
-          ) +
-          theme(
-            axis.text.y = element_text(size = 14),
-            axis.text.x = element_text(angle = 90, hjust = 1, size = 14),
-            legend.position = "none"
-          )
-
-        # Save correlation results figures together
-        output_path <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Correlation_BetweenFeatureGroups_SpearmanRho_AllSites_noErpe.pdf"))
-
-        pdf(file = output_path, height = 7, width = 13)
-        plot_grid(spree,  neckar, ncol = 2, nrow = 1, rel_widths = c(1,1), rel_heights = c(1,1,1,1), label_size = 24, label_y = 0.9,
                    align = "v")
         dev.off()
 
@@ -1167,7 +975,7 @@ plot_pie_venn_box(
         
 ##### 4.2 CONCENTRATION SCALING #####
         
-        # make copies of data tables
+        # Make copies of data tables
         blk_rem_use <- df_csv_TAorig
         md_Samples_use <- md_Samples
         
@@ -1186,8 +994,8 @@ plot_pie_venn_box(
           column_to_rownames("sample_id") %>% 
           select(-sample)
         
-        ## Scaling
-        # feature max norm function
+        ### Scale the averaged feature peak areas - with Erpe sample ###
+        ## Make function to normalize features by the maximum value observed for each across all samples
         normalize <- function(x) {
           return(x / max(x))
         }
@@ -1195,24 +1003,21 @@ plot_pie_venn_box(
         # Applying the normalization function to each column
         blk_avg_fm <- as.data.frame(apply(blk_rem_new, 2, normalize))
         
-        # Define output file path
+        # Define output file path & write .csv
         output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_Concentrations_Scaled.csv'))
-        
-        # Write the CSV file
         write.csv(blk_avg_fm, output_path, row.names = TRUE)
         
+        ### Scale the averaged feature peak areas - without Erpe sample ###
         # Apply normalization to all columns except "Erpe_both_1.mzML" and drop that column
         blk_avg_fm_noErpe <- as.data.frame(apply(blk_rem_new_noErpe, 2, normalize))
         
-        # Define output file path
+        # Define output file path & write .csv
         output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(),'_Concentrations_Scaled_noErpe.csv'))
-        
-        # Write the CSV file
         write.csv(blk_avg_fm_noErpe, output_path, row.names = TRUE)
         
 ##### 4.3 DATA OVERVIEW and RIVER COMPARISON (FIGURE 2) #####
       
-      # Set up dataframe                                                             
+      # Reformat scaled targeted concentration dataframe from wide to long format - Use all Samples (i.e., with Erpe)                                                                
       long_quant <- blk_avg_fm %>%
         tibble::rownames_to_column("Sample") %>%
         pivot_longer(-Sample, names_to = "Compound", values_to = "Concentration")
@@ -1246,7 +1051,6 @@ plot_pie_venn_box(
                              "DEET", 
                              "Diuron", "Flufenacet", "X5.Metolachlor",  "Terbutryn", 
                              "Imidacloprid" ))
-      print(Compound_order)
       
       # Update compound names
       Compound_rename <- c(
@@ -1319,8 +1123,7 @@ plot_pie_venn_box(
       
       # Save venn diagram
       venn_out <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Venn_TargetedCompounds.pdf"))
-      
-      pdf(file = venn_out, height = 3, width = 3)
+      pdf(file = venn_out, height = 4, width = 4)
       print(venn_targeted)
       dev.off()
       
@@ -1358,7 +1161,6 @@ plot_pie_venn_box(
       
       # Save boxplot
       boxplot_out <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Boxplots_TargetedConcentrations_byRiver.pdf"))
-      
       pdf(file = boxplot_out, height = 3, width = 5)
       print(boxplot)
       dev.off()
@@ -1369,7 +1171,7 @@ plot_pie_venn_box(
                                                                                   
 ##### 4.4 HEATMAP of FEATURE GROUPS across SITES (FIGURE 3) #####                                                                            
       
-      # Set up dataframe (use scaled df without Erpe)                                                            
+      # Reformat scaled targeted concentration dataframe from wide to long format - Use all Samples (i.e., with Erpe)                                                                     
       long_quant <- blk_avg_fm_noErpe %>%
         tibble::rownames_to_column("Sample") %>%
         pivot_longer(-Sample, names_to = "Compound", values_to = "Concentration")
@@ -1395,15 +1197,6 @@ plot_pie_venn_box(
       # Filter for main stem sites only
       corr_df_filtered <- corr_df %>%
       filter(FeatureID %in% Compound_order) %>%
-      # filter(Sample %in% c("N01_both_1.mzML",     "N02_both_1.mzML",     "N03_both_1.mzML",     "N04_both_1.mzML",
-      #              "N05_both_1.mzML",     "N06_both_1.mzML",     "N07_both_1.mzML",     "N08_both_1.mzML",     "N09_both_1.mzML",
-      #              "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
-      #              "S01_both_1.mzML",     "S08_both_1.mzML",     "S11_both_1.mzML",     "S13_both_1.mzML",     "S18_both_1.mzML",
-      #              "S26_both_1.mzML",     "S29_both_1.mzML",     "S51_both_1.mzML",
-      #              "S56_both_1.mzML",     "S57_both_1.mzML",     "S64_both_1.mzML",     "S67_both_1.mzML",
-      #              "S69_both_1.mzML",     "S72_both_1.mzML",     "S73_both_1.mzML",
-      #              "S74_both_1.mzML",     "S75_both_1.mzML",     "S76_both_1.mzML",     "S76a_both_1.mzML"))
-      # 
       filter(Sample %in% c("N1_both_1.mzML",     "N2_both_1.mzML",     "N3_both_1.mzML",     "N4_both_1.mzML",
                            "N5_both_1.mzML",     "N6_both_1.mzML",     "N7_both_1.mzML",     "N8_both_1.mzML",     "N9_both_1.mzML",
                            "N10_both_1.mzML",     "N11_both_1.mzML",     "N12_both_1.mzML",
@@ -1420,11 +1213,8 @@ plot_pie_venn_box(
       pivot_wider(names_from = Sample, values_from = Concentration) %>%
       column_to_rownames("Compound") %>%
       as.matrix()
-      
-      library(ComplexHeatmap)
-      library(circlize)
-      
-      # Generate heat map
+
+      # Generate heat map dataframe
       set.seed(1235)
       hmap <- Heatmap(
       heatmap_matrix,  # or use heatmap_matrix if unscaled
@@ -1446,13 +1236,13 @@ plot_pie_venn_box(
       row_km_repeats = 100
       )
       
+      # Plot heatmap
       hk <- ComplexHeatmap::draw(hmap, heatmap_legend_side = "right", annotation_legend_side = "right")
       
       print(hk)
       
       # Save plot
       output_path <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Heatmap_Scaled_TargetedCompounds_Concentrations_MainRiverSites_noErpe.pdf"))
-      
       pdf(file = output_path, height = 30, width = 30)
       print(hk)
       dev.off()
@@ -1504,7 +1294,7 @@ cor_summary <- cor_summary %>%
   mutate(MetadataVar = factor(MetadataVar, levels = meta_vars),
          Compound = factor(Compound, levels = rev(freq_Compounds)))
 
-
+# Add p-value signs to correlation summary
 cor_summary <- cor_summary %>%
   mutate(Signif = case_when(
     Pvalue < 0.001 ~ "***",
@@ -1515,10 +1305,8 @@ cor_summary <- cor_summary %>%
 
 
 
-# Define output file path
+# Define output file path & write .csv
 output_path <- file.path(Directory, "02_Output_DataProducts", paste0(Sys.Date(), "_Correlation_TargetedCompounds_SpearmanRho_AllSites_noErpe.csv"))
-
-# Write the CSV file
 write.csv(cor_summary, output_path, row.names = TRUE)
 
 # Plot correlations in Neckar
@@ -1567,7 +1355,6 @@ spree <- ggplot(cor_summary[cor_summary$ATTRIBUTE_RiverGroup == "Spree" & !is.na
 
 # Save correlation results figures together
 output_path <- file.path(Directory, "03_Output_Figures", paste0(Sys.Date(), "_Correlation_TargetedCompounds_SpearmanRho_AllSites_noErpe.pdf"))
-
 pdf(file = output_path, height = 10.8, width = 12.7)
 plot_grid( spree,  neckar, ncol = 2, nrow = 1, rel_widths = c(1,1), rel_heights = c(1,1,1,1), label_size = 24, label_y = 0.9,
            align = "v")
