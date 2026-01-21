@@ -1,14 +1,14 @@
 # NeckarSpree_DissolvedOrganicCompounds
-R code used to process and analyze targeted and non-targeted LC-MS/MS data acquired from river samples collected from the Neckar and Spree river catchments in Germany. 
+R code used to process and analyze target and non-target LC-MS/MS data acquired from river samples collected from the Neckar and Spree river catchments in Germany. 
 
 # Description of folders and files supporting the manuscript:
-"Targeted and non-targeted analysis reveal similar dissolved organic contaminant patterns 
+"Target and nontarget analysis reveal similar dissolved organic contaminant patterns 
 relative to quantified catchment characteristics along two German rivers"
 
 Lana Graves, Christiane Zarfl, Tina Hirsch, Giovanni A. Vitale, Daniel Petras, Stephanie Spahr
 
 # Code information
-R code by Lana Graves, lana.graves@uni-tuebingen.de
+R code by Lana Graves, lana.graves at uni-tuebingen.de
 
 Code run in RStudio.
 
