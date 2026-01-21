@@ -5,8 +5,8 @@ B2_both_1.mzML	B2	B2			20230511	May	Blank	Blank	Blank_Process	Spree	Spree_Blank	
 B2_both_2.mzML	B2	B2			20230511	May	Blank	Blank	Blank_Process	Spree	Spree_Blank	Spree_Blank	Spree_Blank_Process	Process blank	5/28/2023 0:00	0	IGB																																																					
 B3_both_1.mzML	B3	B3			20230511	May	Blank	Blank	Blank_Process	Spree	Spree_Blank	Spree_Blank	Spree_Blank_Process	Process blank	5/28/2023 0:00	0	IGB																																																					
 B3_both_2.mzML	B3	B3			20230511	May	Blank	Blank	Blank_Process	Spree	Spree_Blank	Spree_Blank	Spree_Blank_Process	Process blank	5/28/2023 0:00	0	IGB																																																					
-N01B_both_1.mzML	N01B	N01B			20230522	May	Blank	Blank	Blank_Field	Neckar	Neckar_Blank	Neckar_Blank	Neckar_Blank_Field	Field blank	5/26/2023 21:16	1	NA																																																					
-N01B_both_2.mzML	N01B	N01B			20230522	May	Blank	Blank	Blank_Field	Neckar	Neckar_Blank	Neckar_Blank	Neckar_Blank_Field	Field blank	5/26/2023 21:33	2	NA																																																					
+N1B_both_1.mzML	N01B	N01B			20230522	May	Blank	Blank	Blank_Field	Neckar	Neckar_Blank	Neckar_Blank	Neckar_Blank_Field	Field blank	5/26/2023 21:16	1	NA																																																					
+N1B_both_2.mzML	N01B	N01B			20230522	May	Blank	Blank	Blank_Field	Neckar	Neckar_Blank	Neckar_Blank	Neckar_Blank_Field	Field blank	5/26/2023 21:33	2	NA																																																					
 PB1_both_1.mzML	PB1	PB1	PB1		20230504	May	Blank	Blank	Blank_Process	Neckar	Neckar_Blank	Neckar_Blank	Neckar_Blank_Process	Process blank	5/26/2023 21:50	3																																																						
 PB1_both_2.mzML	PB1	PB1	PB1		20230504	May	Blank	Blank	Blank_Process	Neckar	Neckar_Blank	Neckar_Blank	Neckar_Blank_Process	Process blank	5/26/2023 22:07	4																																																						
 S1_both_1.mzML	S01	S01	S1	0	20230511	May	River	River	Headwater	Spree	Spree_River	Spree_River	Spree_Headwater	Spree	5/26/2023 22:24	5	IGB	0.060074224	4.7	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0						
